@@ -28,6 +28,11 @@
     ],
     "anykernel_config": "kalama_z",
     "zip_name_prefix": "Z5_Droidspaces_Kernel",
+    "abi_baseline": {
+      "path": "Kokuban/abi/vmlinux.symvers",
+      "allow_crc_mismatch": 0,
+      "allow_missing": 0
+    },
     "bbg": {
       "setup_url": "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh"
     },
