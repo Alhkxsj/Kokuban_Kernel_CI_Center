@@ -5,7 +5,7 @@
     "bakasu_topic_id": 36
   },
   "z5_sm8550": {
-    "repo": "YuzakiKokuban/android_kernel_samsung_sm8550_Z5",
+    "repo": "Alhkxsj/android_kernel_samsung_sm8550_Z5",
     "defconfig": "defconfig",
     "localversion_base": "-android13-Kokuban-Mei-FZB2",
     "lto": "thin",
@@ -27,7 +27,7 @@
       "clang/host/linux-x86/clang-r450784e/bin"
     ],
     "anykernel_config": "kalama_z",
-    "zip_name_prefix": "Z5_Kernel",
+    "zip_name_prefix": "Z5_Droidspaces_Kernel",
     "bbg": {
       "setup_url": "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh"
     },

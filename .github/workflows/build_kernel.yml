@@ -117,7 +117,7 @@ jobs:
     # serialized wave is unaffected. Job-level so that it also applies when this workflow
     # is called as a reusable workflow.
     concurrency:
-      group: kernel-build-${{ inputs.project || github.event.client_payload.project || github.run_id }}
+      group: kernel-build-${{ inputs.project || github.event.client_payload.project || github.run_id }}-${{ inputs.branch || github.event.client_payload.branch || github.ref_name }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -225,24 +225,15 @@ jobs:
             echo "ARTIFACT_NAME=$artifact_name"
           } >> "$GITHUB_ENV"
 
-      - name: Setup Rust for preview builds
-        if: github.ref != 'refs/heads/main'
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.92.0
 
-      - name: Build preview CI Core
-        if: github.ref != 'refs/heads/main'
+      - name: Build CI Core
         run: |
           cargo build --release --locked --manifest-path ci_core_rs/Cargo.toml
           cp ci_core_rs/target/release/kokuban_ci_core ./kokuban_ci_core
-
-      - name: Download CI Core
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          ./scripts/fetch-ci-core.sh
 
       - name: Parse Configuration
         run: ./kokuban_ci_core parse --project "$PROJECT"
