@@ -21,16 +21,6 @@ on:
         description: 'Create Release'
         type: boolean
         default: true
-      custom_localversion:
-        description: 'Custom Localversion Override'
-        type: string
-        required: false
-        default: ''
-      bakasu_setup_arg:
-        description: 'BakaSU setup.sh argument override'
-        type: string
-        required: false
-        default: ''
       apply_bbg:
         description: 'Apply Baseband Guard dynamically during build'
         type: boolean
