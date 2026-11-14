@@ -3279,7 +3279,11 @@ pub fn handle_build(options: BuildOptions) -> Result<()> {
                 false,
             )?;
 
-            handle_notify(release_tag)?;
+            if env::var("TELEGRAM_BOT_TOKEN").is_ok() {
+                handle_notify(release_tag)?;
+            } else {
+                println!("TELEGRAM_BOT_TOKEN not set; skipping Telegram notification");
+            }
         } else {
             return Err(anyhow!("Final zip not found"));
         }
