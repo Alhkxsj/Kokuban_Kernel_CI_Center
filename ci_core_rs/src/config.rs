@@ -27,6 +27,7 @@ pub struct ProjectConfig {
     /// defconfig just before configuration, so the delta stays reviewable in one
     /// small file instead of being buried in a full `.config`.
     pub kconfig_fragment: Option<String>,
+    pub required_kconfig: Option<HashMap<String, String>>,
     /// Reference `symvers` file the whole built symbol table is graded against.
     pub abi_baseline: Option<AbiBaseline>,
     pub extra_host_env: Option<bool>,

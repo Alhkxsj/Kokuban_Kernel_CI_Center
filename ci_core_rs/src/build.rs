@@ -628,6 +628,24 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[test]
+    fn required_kconfig_map_is_enforced() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("required-config-{unique}"));
+        fs::write(&path, "CONFIG_ALPHA=y\n").unwrap();
+        let mut required = HashMap::from([
+            ("CONFIG_ALPHA".to_string(), "y".to_string()),
+            ("CONFIG_BETA".to_string(), "y".to_string()),
+        ]);
+        assert!(validate_required_kconfig(&path, &required).is_err());
+        required.remove("CONFIG_BETA");
+        assert!(validate_required_kconfig(&path, &required).is_ok());
+        fs::remove_file(path).unwrap();
+    }
+
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -842,6 +860,7 @@ write_boot; # use flash_boot to skip ramdisk repack, e.g. for devices with init_
             build_style: build_style.map(str::to_string),
             abi_symbol_gates: None,
             kconfig_fragment: None,
+            required_kconfig: None,
             abi_baseline: None,
             extra_host_env: None,
             disable_security: None,
@@ -1794,6 +1813,15 @@ fn validate_kconfig_entries(path: &Path, entries: &[(&str, &str)]) -> Result<()>
             missing.join(", ")
         ))
     }
+}
+
+fn validate_required_kconfig(path: &Path, required: &HashMap<String, String>) -> Result<()> {
+    let mut entries: Vec<(&str, &str)> = required
+        .iter()
+        .map(|(key, value)| (key.as_str(), value.as_str()))
+        .collect();
+    entries.sort_unstable();
+    validate_kconfig_entries(path, &entries)
 }
 
 /// Reads a `CONFIG_x=y` fragment into `(key, value)` pairs, following `source`
@@ -3057,6 +3085,9 @@ pub fn handle_build(options: BuildOptions) -> Result<()> {
             )?;
         }
         validate_kconfig_entries(&final_config, COMMON_KSU_KCONFIG_ENTRIES)?;
+    }
+    if let Some(required) = &proj.required_kconfig {
+        validate_required_kconfig(&final_config, required)?;
     }
     // Report dropped fragment entries before the ABI checks: if a tuning experiment
     // silently applied nothing, that is the first thing worth knowing.

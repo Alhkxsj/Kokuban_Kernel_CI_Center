@@ -605,6 +605,7 @@ fn handle_add(options: AddOptions) -> Result<()> {
         build_style: options.build_style,
         abi_symbol_gates: None,
         kconfig_fragment: None,
+        required_kconfig: None,
         abi_baseline: None,
         extra_host_env: None,
         disable_security: None,

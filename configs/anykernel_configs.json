@@ -1,15 +1,14 @@
 {
   "kalama_z": {
     "kernel_string": "Z5-Kokuban-Kernel",
-    "device_check": false,
+    "device_check": true,
     "modules": false,
     "systemless": true,
     "cleanup": true,
     "cleanup_on_abort": false,
     "device_names": [
-      "",
-      "",
-      ""
+      "q5q",
+      "b5q"
     ],
     "supported_versions": "",
     "supported_patchlevels": "",
