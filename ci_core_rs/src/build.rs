@@ -3279,7 +3279,10 @@ pub fn handle_build(options: BuildOptions) -> Result<()> {
                 false,
             )?;
 
-            if env::var("TELEGRAM_BOT_TOKEN").is_ok() {
+            if env::var("TELEGRAM_BOT_TOKEN")
+                .map(|token| !token.is_empty())
+                .unwrap_or(false)
+            {
                 handle_notify(release_tag)?;
             } else {
                 println!("TELEGRAM_BOT_TOKEN not set; skipping Telegram notification");
