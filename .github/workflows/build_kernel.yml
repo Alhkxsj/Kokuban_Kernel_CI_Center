@@ -21,6 +21,11 @@ on:
         description: 'Create Release'
         type: boolean
         default: true
+      custom_localversion:
+        description: 'Custom Localversion Override (default: -Alhkxsj)'
+        type: string
+        required: false
+        default: '-Alhkxsj'
       apply_bbg:
         description: 'Apply Baseband Guard dynamically during build'
         type: boolean
