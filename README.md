@@ -6,9 +6,10 @@
 
 在 Actions 中运行 **Build Kernel**：
 
-- Project：`z5_sm8550`
+- Project：固定为 `z5_sm8550`
 - Branch：`main`（LKM）或 `bakasu`（BakaSU + SUSFS）
-- `main`、`bakasu` 被推送时也会自动触发
+- 默认开启 ThinLTO、Hybrid Mount 和正式发布，BBG 默认关闭，SUSFS 自动跟随分支
+- 通常只需选择分支；`main`、`bakasu` 被推送时也会自动触发
 
 构建使用 `clang-r450784e`、ThinLTO 和 AnyKernel3，产物包含 ZIP、`.config`、`vmlinux.symvers`，并可自动发布到内核仓库 Releases。
 
