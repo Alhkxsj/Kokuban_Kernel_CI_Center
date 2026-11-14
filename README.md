@@ -7,7 +7,7 @@
 在 Actions 中运行 **Build Kernel**：
 
 - Project：固定为 `z5_sm8550`
-- Branch：`main`（LKM）或 `bakasu`（BakaSU + SUSFS）
+- Branch：`main`（LKM）或 `bakasu`（BakaSU + SUSFS），Root 方式自动跟随分支，无需重复选择
 - 默认开启 ThinLTO、Hybrid Mount 和正式发布，BBG 默认关闭，SUSFS 自动跟随分支
 - 通常只需选择分支；`main`、`bakasu` 被推送时也会自动触发
 

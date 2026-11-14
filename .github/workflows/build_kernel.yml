@@ -17,14 +17,6 @@ on:
         options:
           - main
           - bakasu
-      ksu_variant:
-        description: 'Build Mode Override'
-        type: choice
-        options:
-          - default
-          - bakasu
-          - lkm
-        default: 'default'
       do_release:
         description: 'Create Release'
         type: boolean
