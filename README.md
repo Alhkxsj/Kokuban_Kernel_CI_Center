@@ -1,304 +1,50 @@
-# Kokuban Kernel CI Center
+# Z5 Droidspaces Kernel CI
 
-## 项目概述
+独立的 Galaxy Z Fold5 / Z Flip5 内核构建仓库，为 [Z5 Droidspaces Kernel](https://github.com/Alhkxsj/android_kernel_samsung_sm8550_Z5) 提供构建、验证、发布和上游更新提醒。
 
-Kokuban Kernel CI Center 是一个专为 Android Linux 内核编译设计的集中式持续集成与交付（CI/CD）平台。该项目旨在通过标准化的构建流程，解决多设备内核维护中的重复性工作问题，并将构建模式收敛到当前仍在维护的 `LKM` 与 `BakaSU` 两条路径。
+## 构建
 
-核心架构采用 **Rust** 编写的 CLI 工具（`kokuban_ci_core`）作为逻辑中枢，配合 **GitHub Actions** 进行流程编排，实现了从源码同步、工具链配置、KernelSU 集成到最终构建发布的完全自动化。
+在 Actions 中运行 **Build Kernel**：
 
-## 核心特性
+- Project：`z5_sm8550`
+- Branch：`main`（LKM）或 `bakasu`（BakaSU + SUSFS）
+- `main`、`bakasu` 被推送时也会自动触发
 
-* **集中化构建编排**：通过统一的 Rust 核心程序管理所有构建逻辑，替代了传统的碎片化 Shell 脚本，确保了构建过程的类型安全与逻辑严密性。
-* **多设备支持**：支持通过配置文件定义不同设备的构建参数（Defconfig、工具链、源码仓库），当前已覆盖三星与小米多个平台。
-* **精简的构建模式**：围绕 `LKM` 与 `BakaSU` 两种模式提供自动补丁与集成支持，已移除旧的 `KSU/MKSU` 内置分支流转。
-* **动态特性注入**：支持在构建阶段按需注入 `Hybrid Mount` 与 `BBG`。Hybrid Mount 适用于所有内核，自动构建默认集成并可通过 workflow 选项关闭，BBG 仅对声明支持的项目可用。
-* **智能工具链管理**：支持从远程 URL 自动下载、校验并解压编译工具链，兼容分卷压缩格式，并自动配置交叉编译环境变量（CLANG, GCC, Binutils）。
-* **发布工作流闭环**：构建完成后自动打包 AnyKernel3 刷机包，推送到对应的 GitHub Releases 页面，并通过 Telegram Bot API 发送详细的发布通知。
-* **上游监听**：`Watch Upstream KernelSU` 会对所有支持对应 KernelSU 变体的项目生效，并自动同步上游变更。
+构建使用 `clang-r450784e`、ThinLTO 和 AnyKernel3，产物包含 ZIP、`.config`、`vmlinux.symvers`，并可自动发布到内核仓库 Releases。
 
-## 系统架构
+## 验证
 
-本项目由以下核心组件构成：
+每次正式构建都会检查：
 
-1. **CI Core (Rust)**: 位于 `ci_core_rs/` 目录。负责解析 `projects.json` 配置、生成 GitHub Actions 构建矩阵、执行具体的编译指令（Make）、处理 AnyKernel3 打包以及执行发布通知。
-2. **配置中心**: 位于 `configs/` 目录。`projects.json` 定义了所有受管项目的元数据；`upstream_commits.json` 用于追踪上游变更。
-3. **工作流 (Workflows)**: 位于 `.github/workflows/` 目录。定义了 CI 的触发条件（手动触发、定时触发、上游变更触发）并调用 CI Core 执行实际任务。
+- 43 项启用配置和 `IP_SET_MAX=65534`
+- `MODVERSIONS=y`
+- `CFS_BANDWIDTH`、`CGROUP_PIDS`、`CGROUP_DEVICE`、`NF_TABLES`、`BRIDGE_NETFILTER` 保持关闭
+- 15,379 个基线符号：**0 CRC mismatch、0 missing**
+- AnyKernel 仅允许 `q5q`、`b5q`
+- 工具链 SHA-256
 
-## 分支与模式
-
-当前结构围绕两个源码分支工作：
-
-* `main`：默认源码分支，对应 `LKM` 构建路径。
-* `bakasu`：`BakaSU` 专用源码分支。
-
-工作流中的 **Build Mode Override** 目前只保留以下选项：
-
-* `default`：跟随当前源码分支。
-* `bakasu`：强制按 `BakaSU` 模式构建。
-* `lkm`：强制按 `LKM` 模式构建。
-
-## 支持设备列表
-
-当前配置文件 (`configs/projects.json`) 已包含以下设备支持：
-
-| 代号 | 设备型号 (SoC) | 对应项目 Key |
-| :--- | :--- | :--- |
-| **Z5** | Galaxy Z Fold/Flip 5 (SM8550) | `z5_sm8550` |
-| **S23** | Galaxy S23 Series (SM8550) | `s23_sm8550` |
-| **S24** | Galaxy S24 Series (SM8650) | `s24_sm8650` |
-| **S25** | Galaxy S25 Series (SM8750) | `s25_sm8750` |
-| **Tab S9** | Galaxy Tab S9 Series (SM8550) | `tabs9_sm8550` |
-| **Tab S10** | Galaxy Tab S10 (MT6989) | `tabs10_mt6989` |
-| **Z6** | Galaxy Z Fold/Flip 6 (SM8650) | `z6_sm8650` |
-| **Mi17** | Xiaomi 17 Series (SM8850, Linux 6.12.69, Hybrid Mount, no BBG) | `mi17_sm8850` |
-| **OnePlus 15** | OnePlus 15 (SM8850, Android 16 GKI Linux 6.12.69) | `oneplus15_sm8850` |
-| **Razr Fold** | Motorola Razr Fold 2026 (SM8845 canoe/`blanc`, Linux 6.12.38, Hybrid Mount, no BBG) | `razrfold_sm8845` |
-
-## 构建与使用
-
-### 1. 手动触发构建
-
-在 GitHub Actions 页面选择 "Build Kernel" 工作流，并配置以下参数：
-
-* **Select Project**: 选择目标设备（如 `s23_sm8550`）。
-* **Git Branch/Tag**: 指定内核源码分支，通常使用 `main` 或 `bakasu`。
-* **Build Mode Override**: 选择构建模式（默认为 `default`，即跟随分支策略）。
-* **Create Release**: 是否在构建成功后创建 GitHub Release。
-* **Apply Hybrid Mount / BBG**: Hybrid Mount 默认开启，BBG 默认关闭，仅对声明支持的项目可用。
-
-### 2. 仓库初始化与分支整理
-
-运行 `Setup Kernel Repos` 后，中心仓库会同步设备仓库通用文件，将旧的 `resukisu`（或更早的 `sukisuultra`）分支迁移为 `bakasu`，并额外尝试删除历史遗留的 `ksu` / `mksu` 远端分支，使设备仓库结构统一到当前的 `main` / `bakasu` 模型。
-
-### 3. 上游监听
-
-`Watch Upstream KernelSU` 会读取每个项目的 `supported_ksu`，对所有支持对应上游变体的项目生效；当前项目均支持 `bakasu`，以 [configs/projects.json](configs/projects.json) 为准。
-
-为避免 Actions 使用量过高（触发过频、短时间大量并发），上游监听与构建按**每周一波**运行：
-
-- 触发时间：每周一 00:00 UTC（GitHub 定时队列通常有数小时延迟）；需要立即处理时可用 `workflow_dispatch` 手动发起一波。
-- 波内严格串行：`update-projects` 与 `build-projects` 都设为 `max-parallel: 1`，同一时刻只有 1 个设备仓库在同步、1 个内核在编译。
-- 检测按项目记录：上游 SHA 变化、尚未成功构建的项目或新接入设备会进入下一波；无待处理项目时只跑一次 `check`。
-- 同步提交带 `[skip ci]`，因此设备仓库自身的 `Trigger Central Build` 不再被自动同步触发；构建由中心仓库在波内统一串行发起（设备仓库上的手动 push 仍会正常触发构建）。
-
-更新与构建全部成功后才确认本波的项目记录。失败不会提前消耗上游版本，下一次会重试；重试可能重复构建本波已成功的设备。检测、更新与构建均使用同一个完整 BakaSU SHA，并检查 setup 实际安装的提交。
-手动触发时可选择 `verify_only=true`，只检测待处理设备、源码分支和 GitHub 写入权限，不更新源码、不构建、不发布、不确认记录。
-
-### 4. 本地模式：x86-64 Linux / Ubuntu 快速编译
-
-本地模式会自动准备内核源码，不要求当前目录已经存在 `./kernel_source`。它会在本机缓存根目录中按项目、分支与构建变体隔离工作区，方便多个设备同时保留缓存：
-
-```text
-~/.cache/kokuban-kernel-ci/
-├── builds/<project>/<branch>-<variant>/kernel_source
-├── downloads/toolchains
-├── repos/kernels/<project>.git
-├── repos/AnyKernel3
-├── artifacts/<project>/<build-id>
-├── logs/<project>/<build-id>.log
-├── sccache
-└── ccache
-```
-
-推荐先在 x86-64 Linux / Ubuntu 上安装依赖：
+CI Core 测试：
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y build-essential git libncurses5-dev bc bison flex \
-  libssl-dev p7zip-full lz4 cpio curl wget libelf-dev dwarves jq lld \
-  pahole libdw-dev unzip zip
+cargo test --locked --manifest-path ci_core_rs/Cargo.toml
 ```
 
-然后直接运行本地构建：
+## 上游监视
 
-```bash
-# LKM / main
-./kokuban build s23_sm8550
+[Watch Z5 Upstream](https://github.com/Alhkxsj/Kokuban_Kernel_CI_Center/actions/workflows/watch-z5-upstream.yml) 每 6 小时检查：
 
-# BakaSU
-./kokuban build s25_sm8750 bakasu bakasu
+- Z5 `main`
+- Z5 `bakasu`
+- CI `main`
 
-# 本地 CLI 仍默认启用 Hybrid Mount；可用开关覆盖 Hybrid Mount 与 BBG
-./kokuban build s25_sm8750 bakasu bakasu --with-bbg
-./kokuban build s25_sm8750 bakasu bakasu --no-hybridmount
+[监视 Issue #1](https://github.com/Alhkxsj/Kokuban_Kernel_CI_Center/issues/1) 只在发现新提交时追加提醒，不重复刷评论，不依赖 fork 网络，也不会自动合并或覆盖本地修改。
 
-# 指定自定义缓存根目录
-./kokuban build mi17_sm8850 bakasu bakasu --local-root ~/kokuban-local-cache
-```
+## 主要文件
 
-`./kokuban` 是仓库根目录中的轻量 CLI 包装器。第一次运行会自动编译 `kokuban_ci_core` 的 release 版，之后会直接复用 `ci_core_rs/target/release/kokuban_ci_core`。常用命令：
+- `configs/projects.json`：Z5 构建配置、kABI 基线和最终配置门禁
+- `configs/anykernel_configs.json`：设备检查和打包规则
+- `ci_core_rs/`：Rust 构建核心
+- `scripts/watch-z5-upstream.py`：独立上游比较与 Issue 通知
+- `.github/workflows/`：构建和监视工作流
 
-```bash
-./kokuban list                 # 列出可用项目
-./kokuban features             # 查看所有项目的 Hybrid Mount / BBG 支持状态
-./kokuban features s25_sm8750  # 查看单个项目的扩展能力配置
-./kokuban validate             # 校验项目配置完整性
-./kokuban validate --strict    # 将未配置工具链摘要等警告视为失败
-./kokuban doctor               # 检查本地依赖
-./kokuban cache status         # 查看本地缓存占用
-./kokuban cache prune --keep-artifacts 5 --older-than-days 14
-./kokuban toolchain checksums  # 输出已缓存工具链包的 SHA-256
-./kokuban local ...            # 直接透传到 kokuban_ci_core local
-./kokuban core ...             # 透传到 kokuban_ci_core 原生命令
-```
-
-正式构建前可以先看计划，不会改动源码或缓存：
-
-```bash
-./kokuban plan s25_sm8750 bakasu bakasu
-```
-
-本地 CLI 默认会给构建传入 `apply_hybridmount=true` 与 `apply_bbg=false`。也可以写入本地默认配置：
-
-```bash
-./kokuban config show
-./kokuban config set apply_bbg false
-./kokuban config set apply_hybridmount true
-./kokuban config set local_root ~/kokuban-local-cache
-```
-
-配置默认保存在 `$XDG_CONFIG_HOME/kokuban-kernel-ci/config`，如果没有设置 `XDG_CONFIG_HOME`，则使用 `~/.config/kokuban-kernel-ci/config`。
-`cache` 与 `toolchain checksums` 命令会优先使用这里配置的 `local_root`，也可以通过 `--local-root` 临时覆盖。
-
-可以把常用构建保存为预设：
-
-```bash
-./kokuban preset set daily-s25 s25_sm8750 bakasu bakasu
-./kokuban preset list
-./kokuban preset show daily-s25
-./kokuban run daily-s25
-```
-
-本地模式默认会执行 `git fetch` 更新源码，并复用已经下载过的工具链包、内核 mirror、AnyKernel3 仓库、`sccache` / `ccache` 目录。已有缓存后，可以用离线模式跳过网络访问：
-
-```bash
-./kokuban build s23_sm8550 --offline
-```
-
-如果只想使用已有源码、不主动拉取远端更新，可使用 `--no-fetch`。如果希望清理内核源码工作区中的未跟踪文件，可使用 `--clean`。
-
-编译并行度默认取 `nproc`。可以通过 `KOKUBAN_MAKE_JOBS` 指定正整数；留空时使用默认值，`0`、负数或其他非法值会使构建报错：
-
-```bash
-KOKUBAN_MAKE_JOBS=16 ./kokuban build s23_sm8550
-```
-
-构建完成后，产物会保留在工作区，同时归档到 `artifacts/<project>/<build-id>`，并更新 `artifacts/<project>/latest` 软链接。归档内容包含刷机包、`.config`、`vmlinux.symvers` 与本次构建日志。
-
-每次构建还会写入 `build-info.json`，记录项目、源码提交、Hybrid Mount / BBG 状态、主机信息、工具链缓存路径与 SHA-256。构建失败时，CLI 会从日志中提取关键错误行和最后一段日志，直接打印失败摘要。
-
-缓存清理示例：
-
-```bash
-./kokuban cache clean artifacts
-./kokuban cache clean logs
-./kokuban cache clean project s23_sm8550
-./kokuban cache clean all
-```
-
-工具链下载支持可选内容校验。在项目配置中添加 `toolchain_sha256` 后，缓存命中和新下载都会验证文件内容：
-
-```json
-"toolchain_sha256": {
-  "https://example.com/toolchain.tar.gz": "expected_sha256_hex"
-}
-```
-
-本地构建会对同一项目加锁，避免两个进程同时更新同一个 mirror 或工作区。不同项目可以并行构建。
-
-如果构建进程被强制杀掉留下旧锁，可以清理锁或在确认安全时强制覆盖：
-
-```bash
-./kokuban cache clean locks
-./kokuban build s23_sm8550 --force-lock
-```
-
-如果希望在固定 Ubuntu 环境中构建，可以使用仓库内的 `Dockerfile` 或 `.devcontainer/devcontainer.json`。脚本检查入口：
-
-```bash
-./scripts/check-shell.sh
-./scripts/test-kokuban-cli.sh
-```
-
-### 5. 本地开发与调试
-
-核心逻辑可独立运行。在配置好 Rust 环境及相关依赖（`repo`, `git`, `make` 等）后，可通过以下命令调试：
-
-```bash
-# 解析项目配置
-cargo run --bin kokuban_ci_core -- parse --project s23_sm8550
-
-# 执行构建流程 (需自行准备环境)
-cargo run --bin kokuban_ci_core -- build --project s23_sm8550 --branch main --do-release false
-
-# 执行 BakaSU 构建
-cargo run --bin kokuban_ci_core -- build --project s25_sm8750 --branch bakasu --do-release false
-
-### Pixel 4 / Pixel 4 XL（floral，Linux 4.14）
-
-项目键为 `floral_sm8150`，源码分支为 `bakasu`，配置为 `floral_defconfig`。
-在 **Build Kernel** 中选择该项目与 `bakasu` 分支；构建模式选择 `bakasu`
-（`default` 也会自动解析）。`Release All Branches` 和自动构建矩阵仅构建这个分支。
-
-源码使用 `YuzakiKokuban/android_kernel_google_msm-4.14` 的 `bakasu` 分支。
-版本格式为 `<源码内核版本>-Kokuban-Kaltsit-BakaSU-g<内核提交>-openela`，
-例如 `4.14.355-Kokuban-Kaltsit-BakaSU-g0123456789ab-openela`，沿用 CI 的 12 位提交标识。
-版本号由源码 Makefile 的 `kernelversion` 读取，不固定为 4.14.357。
-`openela` 是发行后缀，与数字版本分开。以后迁移到 5.10 或更高基线时继续保留品牌格式，
-但必须另行适配并验证构建流程、设备驱动和启动兼容性；当前 `pixel4-4.14` 流程仅验证 4.14。
-
-该项目使用 `pixel4-4.14` 流程：LLVM 12、GNU AArch64 binutils、无 LTO/CFI、
-BakaSU SUSFS Inline Hook（SUSFS 2.3.0），以及内核内建的 Hybrid Mount VFS。
-`--no-susfs` 可使用原有手动 hooks。上游监听固定本波检测到的 BakaSU 完整提交，
-普通构建默认拉取 `main`。不在内核中保存 BakaSU gitlink，实际版本和提交哈希写入日志。
-Baseband Guard 不适用于此项目。
-Hybrid Mount 由内核源码提供，CI 保留其 4.14 适配，不用 GKI 模块覆盖。
-最终配置必须通过 BakaSU/Hybrid Mount/KEYS/TMPFS_XATTR 检查。
-
-刷机包包含 `Image.lz4`，限制 `flame` / `coral`，使用当前 A/B 槽位。
-打包沿用当前 boot 的 DTB、DTBO 和 ramdisk，不刷写其他槽位或分区。
-Wi-Fi、音频驱动、Incremental FS 和 MSM 11ad 代理均编译为内置，未使用的软件看门狗禁用。
-Wi-Fi 在内核初始化时注册，由 ICNSS 在固件就绪后探测；音频 PDR 会向晚注册的订阅者重放
-最近一次已知状态。驱动启动不依赖 BakaSU 守护程序、附加模块或 `/data/adb` 加载脚本。
-CI 会运行 WLAN/PDR 回归检查，并检查 `modules.order` 为空、关键驱动的内置清单及音频
-初始化函数确实链接到内核，且 AK3 中没有 `.ko` 或模块安装器。BakaSU root 功能本身仍需
-与内核接口匹配的管理器/守护程序。首次刷入前仍需验证启动、触控、Wi-Fi、音频、BakaSU 授权
-及 Hybrid Mount VFS 功能；构建与主机校验通过不能替代设备验证。
-
-### BakaSU hook 校验
-
-未启用 SUSFS 的 BakaSU 构建在 setup 后、生成配置前执行 `scripts/bakasu-hooks.py`，
-按项目应用 `configs/bakasu/` 中的手动 hook 补丁；Pixel 4 源码基线已内置相应调用点。
-`Setup Kernel Repos` 同样将补丁及配置写入各仓库的 `bakasu` 分支。
-这条路径启用 `KSU_MANUAL_HOOK`；6.8 以下使用自动 LSM setuid/initrc，
-6.8 及以上显式接入 setresuid/read，input 使用自动 handler。
-exec 的前后调用保留 filename 引用，分别适配普通及 atomic 引用计数。
-最终 `olddefconfig` 后再次检查调用点和配置；不完整、旧接口冲突、补丁不匹配均中止构建。
-所有项目的 BakaSU 构建默认选择独立的 SUSFS Inline Hook 路径；关闭 SUSFS 后使用上述手动路径，二者互斥。
-
-### OnePlus 15 / SUSFS
-
-`oneplus15_sm8850` 使用 `YuzakiKokuban/android_kernel_oneplus_sm8850` 的 `main` / `bakasu` 分支，
-源码导入自 cctv18 的 `android16-6.12-2026-03`，固定校验 Linux `6.12.69`。
-版本基础后缀为 `-android16-Kokuban-Claire`，刷机包前缀为 `OP15`，
-AnyKernel 配置为 `oneplus15`，显示名称为 `OP15-Kokuban-Kernel`。
-该源码为 Android GKI 基线；编译验证不代表已完成一加 15 的设备启动与 vendor 模块兼容验证。
-
-所有设备的 BakaSU 构建默认开启 SUSFS；LKM 默认关闭。可以按构建关闭或显式开启：
-
-```bash
-./kokuban build oneplus15_sm8850 bakasu bakasu
-./kokuban build oneplus15_sm8850 bakasu bakasu --no-susfs
-./kokuban build s23_sm8550 bakasu bakasu --with-susfs
-./kokuban config set apply_susfs auto  # auto / true / false
-```
-
-Actions 的 `apply_susfs` 同样支持 `auto` / `true` / `false`。
-`auto` 跟随项目及构建模式；明确在 LKM 中开启 SUSFS 会报错。
-SUSFS 与手动 hooks 使用独立配置及校验，缓存工作区包含 SUSFS 开关，产物名称包含 `susfs`。
-补丁来源固定到完整提交，并在临时目录完成严格应用与 hooks 校验后才写入源码。
-项目的 `susfs.local_patch` 保存针对设备源码调整后的补丁，`susfs.revision` 固定配套实现文件。
-4.14、5.15、6.1、6.6、6.12 项目均已配置严格适配补丁。Pixel 4 以社区 2.3.0 补丁为基础，
-补齐独立 SUSFS 调用点，并修复挂载 ID 归属和私有 statx 标记返回问题；主机回归测试直接编译实际 C 函数。
-Razr Fold 保留 golden 符号表和关键 CRC 校验；按用户要求取消了从未提供的原厂模块导入清单要求。
-来源、验证范围及 4.14 社区参考见 [SUSFS 接入说明](docs/susfs-integration.md)。
+构建成功不代表已实机验证，刷入前仍需备份并确认固件兼容性。

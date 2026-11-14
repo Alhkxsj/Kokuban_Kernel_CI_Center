@@ -4,29 +4,30 @@ import subprocess
 import sys
 
 MARKER = "<!-- z5-upstream-watch -->"
+WATCH_REPO = "Alhkxsj/Kokuban_Kernel_CI_Center"
 WATCHES = [
     {
         "key": "source-main",
         "label": "Z5 main / LKM",
-        "api_compare": "repos/Alhkxsj/android_kernel_samsung_sm8550_Z5/compare/main...YuzakiKokuban:main",
-        "api_head": "repos/YuzakiKokuban/android_kernel_samsung_sm8550_Z5/commits/main",
-        "compare": "https://github.com/Alhkxsj/android_kernel_samsung_sm8550_Z5/compare/main...YuzakiKokuban:main",
+        "fork_repo": "Alhkxsj/android_kernel_samsung_sm8550_Z5",
+        "upstream_repo": "YuzakiKokuban/android_kernel_samsung_sm8550_Z5",
+        "branch": "main",
         "commits": "https://github.com/YuzakiKokuban/android_kernel_samsung_sm8550_Z5/commits/main",
     },
     {
         "key": "source-bakasu",
         "label": "Z5 bakasu / BakaSU",
-        "api_compare": "repos/Alhkxsj/android_kernel_samsung_sm8550_Z5/compare/bakasu...YuzakiKokuban:bakasu",
-        "api_head": "repos/YuzakiKokuban/android_kernel_samsung_sm8550_Z5/commits/bakasu",
-        "compare": "https://github.com/Alhkxsj/android_kernel_samsung_sm8550_Z5/compare/bakasu...YuzakiKokuban:bakasu",
+        "fork_repo": "Alhkxsj/android_kernel_samsung_sm8550_Z5",
+        "upstream_repo": "YuzakiKokuban/android_kernel_samsung_sm8550_Z5",
+        "branch": "bakasu",
         "commits": "https://github.com/YuzakiKokuban/android_kernel_samsung_sm8550_Z5/commits/bakasu",
     },
     {
         "key": "ci-main",
         "label": "CI Center main",
-        "api_compare": "repos/Alhkxsj/Kokuban_Kernel_CI_Center/compare/main...YuzakiKokuban:main",
-        "api_head": "repos/YuzakiKokuban/Kokuban_Kernel_CI_Center/commits/main",
-        "compare": "https://github.com/Alhkxsj/Kokuban_Kernel_CI_Center/compare/main...YuzakiKokuban:main",
+        "fork_repo": "Alhkxsj/Kokuban_Kernel_CI_Center",
+        "upstream_repo": "YuzakiKokuban/Kokuban_Kernel_CI_Center",
+        "branch": "main",
         "commits": "https://github.com/YuzakiKokuban/Kokuban_Kernel_CI_Center/commits/main",
     },
 ]
@@ -37,16 +38,46 @@ def run(args, capture=True):
     return result.stdout.strip() if capture else ""
 
 
+def history(repo, branch):
+    commits = []
+    for page in range(1, 11):
+        batch = json.loads(run([
+            "gh", "api", f"repos/{repo}/commits?sha={branch}&per_page=100&page={page}"
+        ]))
+        commits.extend(batch)
+        if len(batch) < 100:
+            break
+    return commits
+
+
 def collect():
     data = []
     for watch in WATCHES:
         item = dict(watch)
-        comparison = json.loads(run(["gh", "api", item["api_compare"]]))
-        item["sha"] = run(["gh", "api", item["api_head"], "--jq", ".sha"])
-        item["count"] = comparison.get("total_commits", comparison.get("ahead_by", 0))
+        fork_history = history(item["fork_repo"], item["branch"])
+        upstream_history = history(item["upstream_repo"], item["branch"])
+        upstream_shas = {commit["sha"] for commit in upstream_history}
+        common = next(
+            (commit["sha"] for commit in fork_history if commit["sha"] in upstream_shas),
+            None,
+        )
+        if common is None:
+            raise RuntimeError(f'No common ancestor found for {item["label"]}')
+
+        pending = []
+        for commit in upstream_history:
+            if commit["sha"] == common:
+                break
+            pending.append(commit)
+
+        item["sha"] = upstream_history[0]["sha"]
+        item["count"] = len(pending)
+        item["compare"] = (
+            f'https://github.com/{item["upstream_repo"]}/compare/{common}...{item["branch"]}'
+        )
         item["log"] = "\n".join(
             f'{commit["sha"][:12]} {commit["commit"]["message"].splitlines()[0]}'
-            for commit in comparison["commits"][:15]
+            for commit in pending[:15]
         )
         data.append(item)
     return data
@@ -65,7 +96,7 @@ def issue_state(body):
 
 def find_issue():
     output = run([
-        "gh", "issue", "list", "--state", "all", "--limit", "100", "--json",
+        "gh", "issue", "list", "--repo", WATCH_REPO, "--state", "all", "--limit", "100", "--json",
         "number,state,title,body,url,updatedAt",
     ])
     candidates = [issue for issue in json.loads(output) if MARKER in issue["body"]]
@@ -169,7 +200,7 @@ def main():
     if not issue_open:
         if not issue or changed:
             url = run([
-                "gh", "issue", "create",
+                "gh", "issue", "create", "--repo", WATCH_REPO,
                 "--title", "[Upstream] Z5 上游更新监视",
                 "--body", dashboard(data),
             ])
@@ -178,17 +209,17 @@ def main():
 
     number = str(issue["number"])
     if changed:
-        run(["gh", "issue", "comment", number, "--body", changes(changed)])
-        run(["gh", "issue", "edit", number, "--body", dashboard(data)])
+        run(["gh", "issue", "comment", number, "--repo", WATCH_REPO, "--body", changes(changed)])
+        run(["gh", "issue", "edit", number, "--repo", WATCH_REPO, "--body", dashboard(data)])
         print(f'Updated issue #{number}: {len(changed)} branch(es) changed')
         return
 
     if not pending and previous.get("pending") == "1":
         run([
-            "gh", "issue", "comment", number,
+            "gh", "issue", "comment", number, "--repo", WATCH_REPO,
             "--body", "当前监视的上游分支均已同步，没有待同步提交。",
         ])
-        run(["gh", "issue", "edit", number, "--body", dashboard(data)])
+        run(["gh", "issue", "edit", number, "--repo", WATCH_REPO, "--body", dashboard(data)])
         print(f'Marked issue #{number} as synchronized')
         return
 
